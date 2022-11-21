@@ -22,30 +22,15 @@ class DataQualityOperator(BaseOperator):
 
         for table in self.tables:
 
-            query = "SELECT COUNT(*) FROM {}".format(table)
+            records = redshift_hook.get_records("SELECT COUNT(*) FROM {}".format(table))
 
-            self.log.info(query)
+            if len(records) < 1 or len(records[0]) < 1:
+                self.log.error("{} returned no results".format(table))
+                raise ValueError("Data quality check failed. {} returned no results".format(table))
 
-            connection = redshift_hook.get_conn()
+            num_records = records[0][0]
+            if num_records == 0:
+                self.log.error("No records present in destination table {}".format(table))
+                raise ValueError("No records present in destination {}".format(table))
 
-            cursor = connection.cursor()
-
-            cursor.execute(query)
-
-            records = cursor.fetchall()
-
-            self.log.info(records[0][0])
-
-            if len(records) < 1 or len(records[0]) < 1 or records[0][0] < 1:
-
-                error_message = "Data quality check failed on table {}.".format(table)
-
-                self.log.error(error_message)
-
-                raise ValueError(error_message)
-
-            else:
-
-                self.log.info(
-                    f"Data quality on table {table} check passed with {records[0][0]} records"
-                )
+            self.log.info("Data quality on table {} check passed with {} records".format(table, num_records))
